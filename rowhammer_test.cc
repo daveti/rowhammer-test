@@ -60,6 +60,24 @@ class Timer {
   }
 };
 
+//daveti: get the cache line mask once
+uint64_t cl_mask;
+bool cl_flush = false;
+static inline void get_cl_mask(void)
+{
+  asm("mrs x3, ctr_el0\n\t"
+	"lsr x3, x3, #16\n\t"
+	"and x3, x3, #0xf\n\t"
+	"mov x2, #4\n\t"
+	"lsl x2, x2, x3\n\t"           /* cache line size */
+	/* x2 <- minimal cache line size in cache system */
+	"sub %[res], x2, #1\n\t"
+	: [res] "=r" (cl_mask)
+	:
+	: "x2", "x3");
+};
+
+
 static void toggle(int iterations, int addr_count) {
   Timer timer;
   for (int j = 0; j < iterations; j++) {
@@ -71,8 +89,18 @@ static void toggle(int iterations, int addr_count) {
     for (int i = 0; i < toggles; i++) {
       for (int a = 0; a < addr_count; a++)
         sum += *addrs[a] + 1;
-      for (int a = 0; a < addr_count; a++)
-        asm volatile("clflush (%0)" : : "r" (addrs[a]) : "memory");
+      for (int a = 0; a < addr_count; a++) {
+        //asm volatile("clflush (%0)" : : "r" (addrs[a]) : "memory");
+	//daveti: for armv8, x0: VA
+	if (cl_flush)
+	  asm volatile("mov x0, %[addr]\n\t"
+		"bic x0, x0, %[mask]\n\t"
+		"dc civac, x0\n\t"      /* clean & invalidate data or unified cache */
+ 		"dsb sy\n\t"
+		: 
+		: [addr] "r" (addrs[a]), [mask] "r" (cl_mask)
+		: "x0", "memory");
+      }
     }
 
     // Sanity check.  We don't expect this to fail, because reading
@@ -106,6 +134,10 @@ void main_prog() {
 
   printf("clear\n");
   memset(g_mem, 0xff, mem_size);
+
+  //daveti: get mask
+  get_cl_mask();
+  printf("cache line mask [0x%lx]\n", cl_mask);
 
   Timer t;
   int iter = 0;

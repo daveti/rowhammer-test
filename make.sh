@@ -20,6 +20,7 @@ cflags="-g -Wall -Werror -O2"
 
 g++ $cflags rowhammer_test.cc -o rowhammer_test
 
-if [ "$(uname)" = Linux ]; then
-  g++ $cflags -std=c++11 double_sided_rowhammer.cc -o double_sided_rowhammer
-fi
+#daveti: focus on the basic
+#if [ "$(uname)" = Linux ]; then
+#  g++ $cflags -std=c++11 double_sided_rowhammer.cc -o double_sided_rowhammer
+#fi
